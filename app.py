@@ -609,7 +609,8 @@ def get_calendar_service():
     calendar_scopes = ['https://www.googleapis.com/auth/calendar']
     credentials = service_account.Credentials.from_service_account_info(
         calendar_credentials_dict, scopes=calendar_scopes)
-    return build('calendar', 'v3', credentials=calendar_credentials_dict)
+    calendar_service = build('calendar', 'v3', credentials=credentials)
+    return calendar_service
 calendar_credentials = get_calendar_service()
 
 # 新增事件

@@ -725,8 +725,8 @@ def start_scheduler():
 
 
 # -------- 接收 LINE 訊息 --------
-@app.route("/linebot", methods=['POST'])
-def linebot():
+@app.route("/callback", methods=['POST'])
+def callback():
     signature = request.headers['X-Line-Signature']        
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)

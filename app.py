@@ -38,20 +38,9 @@ line_bot_api = LineBotApi(access_token)
 handler = WebhookHandler(channel_secret)
 
 # 翻譯
-API_KEY = "ACIA7CtnyAYfacBmleJkkwHVDGyp9EYjaHkU0BOcblgcD4BckEwCJQQJ99BCAC3pKaRXJ3w3AAAbACOGhj1J"
-ENDPOINT = "https://api.cognitive.microsofttranslator.com/"
-REGION = "eastasia"
-'''
-# 記帳
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("python-money-454314-193e05993b2c.json", scope)
-client = gspread.authorize(creds)
-user_data = {}
-
-# 行事曆
-SERVICE_ACCOUNT_FILE = r"line-calendar-456111-a754708249ce.json"
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-'''
+API_KEY = os.getenv("API_KEY")
+ENDPOINT = os.getenv("ENDPOINT")
+REGION = os.getenv("REGION")
 
 # Google Sheets API (記帳/accounting)
 def setup_sheets_client():

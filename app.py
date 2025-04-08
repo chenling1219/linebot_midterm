@@ -42,21 +42,21 @@ API_KEY = os.getenv("API_KEY")
 ENDPOINT = os.getenv("ENDPOINT")
 REGION = os.getenv("REGION")
 
-# Google Calendar API (行事曆)
+# money
 def setup_sheets_client():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
     credentials_dict = {
         "type" :"service_account",
-        "project_id": os.getenv("project_id"),
-        "private_key_id": os.getenv("private_key_id"),
-        "private_key": os.getenv("private_key").replace('\\n', '\n'),
-        "client_email": os.getenv("client_email"),
-        "client_id": os.getenv("client_id"),
+        "project_id": os.getenv("project_id_money"),
+        "private_key_id": os.getenv("private_key_id_money"),
+        "private_key": os.getenv("private_key_money").replace('\\n', '\n'),
+        "client_email": os.getenv("client_email_money"),
+        "client_id": os.getenv("client_id_money"),
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
         "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": os.getenv("client_x509_cert_url"),
+        "client_x509_cert_url": os.getenv("client_x509_cert_url_money"),
         "universe_domain": "googleapis.com"
     }
     
@@ -593,23 +593,23 @@ USER_ID = os.getenv('USER_ID')
 # 服務帳戶的日曆授權
 def get_calendar_service():
     calendar_credentials_dict = {
-        "type": "service_account",
-        "project_id": os.getenv("project_id_money"),
-        "private_key_id": os.getenv("private_key_id_money"),
-        "private_key": os.getenv("private_key_money").replace('\\n', '\n'),
-        "client_email": os.getenv("client_email_money"),
-        "client_id": os.getenv("client_id_money"),
+        "type" :"service_account",
+        "project_id": os.getenv("project_id"),
+        "private_key_id": os.getenv("private_key_id"),
+        "private_key": os.getenv("private_key").replace('\\n', '\n'),
+        "client_email": os.getenv("client_email"),
+        "client_id": os.getenv("client_id"),
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": os.getenv("client_x509_cert_url_money"),
+        "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": os.getenv("client_x509_cert_url"),
         "universe_domain": "googleapis.com"
     }
-    SCOPES = ['https://www.googleapis.com/auth/calendar']
-
+    calendar_scopes = ['https://www.googleapis.com/auth/calendar']
     credentials = service_account.Credentials.from_service_account_info(
-        calendar_credentials_dict, scopes=SCOPES)
-    return build('calendar', 'v3', credentials=credentials)
+        calendar_credentials_dict, scopes=calendar_scopes)
+    return build('calendar', 'v3', credentials=calendar_credentials_dict)
+calendar_credentials = get_calendar_service()
 
 # 新增事件
 def add_event(summary, start_time, end_time, location=''):

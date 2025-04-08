@@ -36,7 +36,7 @@ app = Flask(__name__)
 access_token = os.getenv("access_token")
 channel_secret =  os.getenv("channel_secret")
 line_bot_api = LineBotApi(access_token)
-handler = WebhookHandler(channel_secret)
+line_handler = WebhookHandler(channel_secret)
 
 # 翻譯
 API_KEY = os.getenv("API_KEY")
@@ -731,13 +731,13 @@ def linebot():
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
     try:
-        handler.handle(body, signature)  
+        line_handler.handle(body, signature)  
     except:
         print("error, but still work.") 
     return 'OK'
 
 
-@handler.add(MessageEvent, message=TextMessage)
+@line_handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     global last_msg, memlist, random_list
     msg = event.message.text
@@ -785,7 +785,7 @@ def handle_message(event):
     #print(msg)
 
 
-@handler.add(MessageEvent, message=LocationMessage)
+@line_handler.add(MessageEvent, message=LocationMessage)
 def handle_location_message(event):
     global last_msg
     tk = event.reply_token
@@ -799,7 +799,7 @@ def handle_location_message(event):
     elif last_msg == "weather":
         line_bot_api.reply_message(tk, TextSendMessage(text=weather(address)))
     
-@handler.add(PostbackEvent)
+@line_handler.add(PostbackEvent)
 def handle_postback(event):
     tk = event.reply_token
     postback_data = event.postback.data

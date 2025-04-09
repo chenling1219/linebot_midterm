@@ -490,8 +490,8 @@ def foodie(tk, user_id, result):
         if result[0] == '附近美食' or result[0] == '附近景點':
             if len(result) == 1:  # 尚未選範圍
                 location_ok = 'N'
-                if os.path.exists('/temp/'+user_id+'.txt'):
-                    with open('/temp/'+user_id+'.txt', 'r') as f:
+                if os.path.exists('/tmp/'+user_id+'.txt'):
+                    with open('/tmp/'+user_id+'.txt', 'r') as f:
                         line = f.readline()
                         data = line.strip().split(',')
                         old_timestamp = int(data[2])
@@ -511,7 +511,7 @@ def foodie(tk, user_id, result):
                 else:
                     line_bot_api.reply_message(tk, TextSendMessage(text='需要分享你的位置資訊才能進行查詢'))
             else:
-                with open('/temp/'+user_id+'.txt', 'r') as f:
+                with open('/tmp/'+user_id+'.txt', 'r') as f:
                     line = f.readline()
                     data = line.strip().split(',')
                     latitude = data[0]
@@ -581,7 +581,7 @@ def foodie(tk, user_id, result):
 def location(latitude, longitude, user_id, tk):
     current_timestamp = int(time.time())
     os.makedirs('user_data', exist_ok=True)
-    with open('/temp/'+user_id+'.txt', 'w') as f:
+    with open('/tmp/'+user_id+'.txt', 'w') as f:
         f.write(f"{latitude},{longitude},{current_timestamp}\n")
     buttons_template = ButtonsTemplate(
         title="選擇項目", 

@@ -158,7 +158,7 @@ def randomone(tk, msg, last_msg_01, memlist):
 # -------- 天氣查詢功能 --------
 def weather(address):
     result = {}
-    code = 'CWA-9ECE9E2D-1DF4-45DB-8999-FAC76234B2A3'
+    code = os.getenv('code')
     try:
         urls = [
             f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001?Authorization={code}',
@@ -471,8 +471,8 @@ def money(tk, msg, user_id):
 
 # -------- 查詢附近美食 --------
 main_menu = {
-    "附近美食": ["1公里內", "1~3公里", "3~5公里", "5~10公里"],
-    "附近景點": ["1公里內", "1~3公里", "3~5公里", "5~10公里"],
+    "附近美食": ["1公里內4★以上", "3公里內4.2★以上", "5公里內4.5★以上"],
+    "附近景點": ["1公里內3.5★以上", "3公里內4★以上", "5公里內4.2★以上", "10公里內4.5★以上"],
     "各地美食": ["北台灣", "中台灣", "南臺灣", "東台灣"],
     "各地景點": ["北台灣", "中台灣", "南臺灣", "東台灣"]
 }
@@ -488,16 +488,15 @@ taiwan_counties = {
 def foodie(tk, user_id, result):
     if result[0] in main_menu:
         if result[0] == '附近美食' or result[0] == '附近景點':
-            if (len(result) == 1):    # 尚未選範圍
+            if len(result) == 1:  # 尚未選範圍
                 location_ok = 'N'
-                if (os.path.exists('user_data\\'+user_id+'.txt')):
-                    f=open('user_data\\'+user_id+'.txt','r')
-                    line = f.readline()
-                    data = line.strip().split(',')
-                    old_timestamp = int(data[2])
-                    f.close()
+                if os.path.exists('user_data\\'+user_id+'.txt'):
+                    with open('user_data\\'+user_id+'.txt', 'r') as f:
+                        line = f.readline()
+                        data = line.strip().split(',')
+                        old_timestamp = int(data[2])
                     current_timestamp = int(time.time())
-                    if (current_timestamp - old_timestamp < 600):
+                    if current_timestamp - old_timestamp < 600:
                         location_ok = 'Y'
                 
                 if location_ok == 'Y':                
@@ -505,76 +504,74 @@ def foodie(tk, user_id, result):
                     buttons_template = ButtonsTemplate(
                         title="選擇範圍", 
                         text="請選擇" + result[0] + "多大的範圍", 
-                        actions=[
-                            MessageAction(label=range, text=result[0]+" " +range) for range in ranges
-                        ]
+                        actions=[MessageAction(label=range, text=result[0] + " " + range) for range in ranges]
                     )
                     template_message = TemplateSendMessage(alt_text="選擇範圍", template=buttons_template)
                     line_bot_api.reply_message(tk, template_message)
                 else:
-                    line_bot_api.reply_message(tk,TextSendMessage(text='需要分享你的位置資訊才能進行查詢'))
+                    line_bot_api.reply_message(tk, TextSendMessage(text='需要分享你的位置資訊才能進行查詢'))
             else:
-                #line_bot_api.reply_message(event.reply_token,TextSendMessage(text=f"您選擇的範圍是: {result[1]}")) 
-                f=open('user_data\\'+user_id+'.txt','r')
-                line = f.readline()
-                data = line.strip().split(',')
-                latitude = data[0]
-                longitude = data[1]
-                f.close()
+                with open('user_data\\'+user_id+'.txt', 'r') as f:
+                    line = f.readline()
+                    data = line.strip().split(',')
+                    latitude = data[0]
+                    longitude = data[1]
                 if result[0] == '附近美食':
-                    type = 'restaurant'    # 餐廳
+                    type = 'restaurant'
                 else:
-                    type = 'tourist_attraction'   # 旅遊景點
-                # 設定你的 Google Places API 金鑰
-                API_KEY = 'AIzaSyA5cxR8unyGbIH1_PrGNgBOyGjlDM4v6-A'
-                # Google Places API URL
+                    type = 'tourist_attraction'
+                pat = r'(\d+)公里內([\d|.]+)★以上'
+                match = re.search(pat, result[1])
+                radius = int(match.group(1)) * 1000
+                stars = match.group(2)
+                API_KEY_foodie = os.getenv('API_KEY_foodie')
                 url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
-                # 設定請求的參數
-                params = {
-                    'location': f'{latitude},{longitude}',  # 經緯度
-                    'radius': 1000,  # 半徑，單位是米
-                    'type': type,  # 類型設置為餐廳
-                #    'keyword': '美食',  # 關鍵字，這裡你可以設置為美食
-                    'language': 'zh-TW',
-                    'key': API_KEY  # 你的 API 金鑰
-                #    'rankby': 'prominence',  # prominence:按顯著性排序/distance：按距離排序  
-                #    'opennow': 'true',  # 查詢當前開放的餐廳
-                }
-                # 發送請求到 Google Places API
-                response = requests.get(url, params=params)
-                # 解析回應的 JSON 數據
-                data = response.json()           
-                # 顯示附近標的物的名稱、地址、評價
-                if data['status'] == 'OK':
-                    target = ''
-                    for place in data['results']:    # name, vicinity, geometry.location(lat,lng), rating, user_ratings_total, price_level, formatted_address
-                        name = place['name']
-                        address = place.get('vicinity', '無地址')
-                        rating = place.get('rating', '')
-                        target += f"【{name}】{rating}★\n{address}\n"
-                    line_bot_api.reply_message(tk,TextSendMessage(text=target)) 
+                pagetoken = None
+                target = ''
+                while True:
+                    params = {
+                        'location': f'{latitude},{longitude}',
+                        'radius': radius,
+                        'type': type,
+                        'language': 'zh-TW',
+                        'key': API_KEY_foodie,
+                        'rankby': 'prominence'
+                    }
+                    if pagetoken:
+                        params['pagetoken'] = pagetoken
+                    response = requests.get(url, params=params)
+                    data = response.json()
+                    if data['status'] == 'OK':
+                        for place in data['results']:
+                            name = place['name']
+                            address = place.get('vicinity', '無地址')
+                            rating = place.get('rating', 0)
+                            if rating > float(stars):
+                                target += f"【{name}】{rating}★\n{address}\n"
+                        pagetoken = data.get('next_page_token')
+                        if not pagetoken:
+                            break
+                        time.sleep(2)  # Avoid API rate limit
+                    else:
+                        break
+                if target:
+                    line_bot_api.reply_message(tk, TextSendMessage(text=target))
                 else:
-                    print("無法找到" + result[0])
-                
+                    line_bot_api.reply_message(tk, TextSendMessage(text="無法找到符合條件的" + result[0]))
     else:
-        # 如果用戶輸入其他文字，顯示縣市選擇
         buttons_template = ButtonsTemplate(
             title="選擇項目", 
             text="請選擇你要查詢的項目", 
-            actions=[
-                MessageAction(label=menu_item, text=menu_item) for menu_item in main_menu.keys()
-            ]
+            actions=[MessageAction(label=menu_item, text=menu_item) for menu_item in main_menu.keys()]
         )
         template_message = TemplateSendMessage(alt_text="選擇項目", template=buttons_template)
         line_bot_api.reply_message(tk, template_message)
 
 def location(latitude, longitude, user_id, tk):
     current_timestamp = int(time.time())
-    f=open('user_data\\'+user_id+'.txt','w')
-    f.write(f"{latitude},{longitude},{current_timestamp}\n")
-    f.close()
-    #aa=f"User location: Latitude: {latitude}, Longitude: {longitude}, UID: {user_id}"
-    #line_bot_api.reply_message(event.reply_token,TextSendMessage(text=aa)) 
+    os.makedirs('user_data', exist_ok=True)
+    with open('user_data\\'+user_id+'.txt', 'w') as f:
+        f.write(f"{latitude},{longitude},{current_timestamp}\n")
     buttons_template = ButtonsTemplate(
         title="選擇項目", 
         text="請選擇你要查詢的項目", 
@@ -584,9 +581,6 @@ def location(latitude, longitude, user_id, tk):
     )
     template_message = TemplateSendMessage(alt_text="選擇項目", template=buttons_template)
     line_bot_api.reply_message(tk, template_message)
-
-
-
 
 # -------- 行事曆 --------
 USER_ID = os.getenv('USER_ID')
@@ -798,6 +792,7 @@ def handle_location_message(event):
         last_msg = "foodie02"
     elif last_msg == "weather":
         line_bot_api.reply_message(tk, TextSendMessage(text=weather(address)))
+
     
 @line_handler.add(PostbackEvent)
 def handle_postback(event):

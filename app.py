@@ -14,7 +14,7 @@ from azure.core.exceptions import HttpResponseError
 #Money
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, timedelta
 
 #calender
 from google.oauth2 import service_account
@@ -310,7 +310,8 @@ def money(tk, msg, user_id):
             category = user_data[user_id]["category"]
             amount = user_data[user_id]["amount"]
             # 將資料寫入 Google Sheets
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            tz_utc_8 = timezone(timedelta(hours=8))
+            now = datetime.now(tz_utc_8).strftime("%Y-%m-%d %H:%M:%S")
             sheet.append_row([now, user_id, category, amount])
 
             line_bot_api.reply_message(tk, TextSendMessage(text=f'已記錄 {category}: {amount} 元！'))
@@ -580,7 +581,6 @@ def foodie(tk, user_id, result):
 
 def location(latitude, longitude, user_id, tk):
     current_timestamp = int(time.time())
-    os.makedirs('user_data', exist_ok=True)
     with open('/tmp/'+user_id+'.txt', 'w') as f:
         f.write(f"{latitude},{longitude},{current_timestamp}\n")
     buttons_template = ButtonsTemplate(
@@ -819,5 +819,4 @@ def handle_postback(event):
     line_bot_api.reply_message(tk, [TextMessage(text=result if result else "No translation available")])
 
 if __name__ == '__main__':
-    start_scheduler()
     app.run()

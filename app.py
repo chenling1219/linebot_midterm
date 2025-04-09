@@ -490,8 +490,8 @@ def foodie(tk, user_id, result):
         if result[0] == '附近美食' or result[0] == '附近景點':
             if len(result) == 1:  # 尚未選範圍
                 location_ok = 'N'
-                if os.path.exists('user_data\\'+user_id+'.txt'):
-                    with open('user_data\\'+user_id+'.txt', 'r') as f:
+                if os.path.exists('/temp/'+user_id+'.txt'):
+                    with open('/temp/'+user_id+'.txt', 'r') as f:
                         line = f.readline()
                         data = line.strip().split(',')
                         old_timestamp = int(data[2])
@@ -511,53 +511,64 @@ def foodie(tk, user_id, result):
                 else:
                     line_bot_api.reply_message(tk, TextSendMessage(text='需要分享你的位置資訊才能進行查詢'))
             else:
-                with open('user_data\\'+user_id+'.txt', 'r') as f:
+                with open('/temp/'+user_id+'.txt', 'r') as f:
                     line = f.readline()
                     data = line.strip().split(',')
                     latitude = data[0]
                     longitude = data[1]
                 if result[0] == '附近美食':
-                    type = 'restaurant'
+                    type = 'restaurant'    # 餐廳
                 else:
-                    type = 'tourist_attraction'
+                    type = 'tourist_attraction'   # 旅遊景點
                 pat = r'(\d+)公里內([\d|.]+)★以上'
-                match = re.search(pat, result[1])
+                match = re.search(pat,result[1])
                 radius = int(match.group(1)) * 1000
                 stars = match.group(2)
                 API_KEY_foodie = os.getenv('API_KEY_foodie')
-                url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
+                # Google Places API URL
+                url = f'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
                 pagetoken = None
                 target = ''
+                cc=0
                 while True:
+                    # 設定請求的參數
                     params = {
-                        'location': f'{latitude},{longitude}',
-                        'radius': radius,
-                        'type': type,
+                        'location': f'{latitude},{longitude}',  # 經緯度
+                        'radius': radius,  # 半徑，單位是米
+                        'type': type,  # 類型設置為餐廳
+                    #    'keyword': '美食',  # 關鍵字，這裡你可以設置為美食
                         'language': 'zh-TW',
-                        'key': API_KEY_foodie,
-                        'rankby': 'prominence'
+                        'key': API_KEY_foodie,  # 你的 API 金鑰
+                        'rankby': 'prominence',  # prominence:按受歡迎程度排序/distance：按距離排序  
+                    #    'opennow': 'true',  # 查詢當前開放的餐廳
                     }
                     if pagetoken:
                         params['pagetoken'] = pagetoken
+                    # 發送請求到 Google Places API
                     response = requests.get(url, params=params)
-                    data = response.json()
+                    # 解析回應的 JSON 數據
+                    data = response.json() 
+                    cc = cc + 1                    
+                    # 取出附近標的物的名稱、地址、評價
                     if data['status'] == 'OK':
-                        for place in data['results']:
+                        for place in data['results']:    # name, vicinity, geometry.location(lat,lng), rating, user_ratings_total, price_level, formatted_address
                             name = place['name']
                             address = place.get('vicinity', '無地址')
                             rating = place.get('rating', 0)
                             if rating > float(stars):
                                 target += f"【{name}】{rating}★\n{address}\n"
-                        pagetoken = data.get('next_page_token')
+                        #if cc == 1:
+                        #    line_bot_api.reply_message(tk,TextSendMessage(text=target))
+                        #    return                       
+                        pagetoken = data.get('next_page_token')   # 一次20筆，是否有下一頁
                         if not pagetoken:
-                            break
-                        time.sleep(2)  # Avoid API rate limit
-                    else:
-                        break
-                if target:
-                    line_bot_api.reply_message(tk, TextSendMessage(text=target))
+                            break     # 沒有下一頁，跳出迴圈                  
+                        time.sleep(2)   # 有下一頁，等待幾秒鐘（如：2秒鐘以上，避免超過 API 請求限制）
+                if target != '':                            
+                    line_bot_api.reply_message(tk,TextSendMessage(text=target)) 
                 else:
-                    line_bot_api.reply_message(tk, TextSendMessage(text="無法找到符合條件的" + result[0]))
+                    print("無法找到" + result[0])
+
     else:
         buttons_template = ButtonsTemplate(
             title="選擇項目", 
@@ -570,7 +581,7 @@ def foodie(tk, user_id, result):
 def location(latitude, longitude, user_id, tk):
     current_timestamp = int(time.time())
     os.makedirs('user_data', exist_ok=True)
-    with open('user_data\\'+user_id+'.txt', 'w') as f:
+    with open('/temp/'+user_id+'.txt', 'w') as f:
         f.write(f"{latitude},{longitude},{current_timestamp}\n")
     buttons_template = ButtonsTemplate(
         title="選擇項目", 

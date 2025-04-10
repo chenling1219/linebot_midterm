@@ -644,9 +644,15 @@ def delete_event_by_keyword(keyword):
 def get_today_events():
     service = get_calendar_service()
     now = datetime.now()
-    start = now.replace(hour=0, minute=0, second=0).isoformat()
-    end = now.replace(hour=23, minute=59, second=59).isoformat()
-    events_result = service.events().list(calendarId='primary', timeMin=start, timeMax=end).execute()
+    start = now.replace(hour=0, minute=0, second=0).isoformat() + '+08:00'
+    end = now.replace(hour=23, minute=59, second=59).isoformat() + '+08:00'
+    events_result = service.events().list(
+        calendarId='primary',
+        timeMin=start,
+        timeMax=end,
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
     return events_result.get('items', [])
 
 # 自然語言處理（NLU）來解析意圖

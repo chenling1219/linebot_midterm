@@ -240,8 +240,14 @@ def chooseLen(tk, msg):
             items=[
                 QuickReplyButton(action=PostbackAction(label="英文",data=f"lang=en&text={msg}",display_text="英文")),
                 QuickReplyButton(action=PostbackAction(label="日文",data=f"lang=ja&text={msg}",display_text="日文")),
+                QuickReplyButton(action=PostbackAction(label="韓文",data=f"lang=ko&text={msg}",display_text="韓文")),
                 QuickReplyButton(action=PostbackAction(label="繁體中文",data=f"lang=zh-Hant&text={msg}",display_text="繁體中文")),
-                QuickReplyButton(action=PostbackAction(label="文言文",data=f"lang=lzh&text={msg}",display_text="文言文"))
+                QuickReplyButton(action=PostbackAction(label="簡體中文",data=f"lang=zh-Hans&text={msg}",display_text="簡體中文")),
+                QuickReplyButton(action=PostbackAction(label="文言文",data=f"lang=lzh&text={msg}",display_text="文言文")),
+                QuickReplyButton(action=PostbackAction(label="法文",data=f"lang=fr&text={msg}",display_text="法文")),
+                QuickReplyButton(action=PostbackAction(label="西班牙文",data=f"lang=es&text={msg}",display_text="西班牙文")),
+                QuickReplyButton(action=PostbackAction(label="阿拉伯文",data=f"lang=ar&text={msg}",display_text="阿拉伯文")),
+                QuickReplyButton(action=PostbackAction(label="德文",data=f"lang=de&text={msg}",display_text="德文"))
             ]
         ))
     ]

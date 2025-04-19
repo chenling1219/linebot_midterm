@@ -955,8 +955,8 @@ def handle_message(event):
     elif msg == '關閉記帳功能':
         last_msg = ""
     elif msg == '查詢附近美食與景點':
-        line_bot_api.reply_message(tk, TextSendMessage(text='請按左下角加號分享你的位置'))
-        last_msg = "foodie01"
+        foodie(tk, user_id, result)
+        last_msg = "foodie02"
     elif msg == '行事曆':
         line_bot_api.reply_message(tk, TextSendMessage(text='新增行程/刪除行程/查詢行程'))
         last_msg = "calender"

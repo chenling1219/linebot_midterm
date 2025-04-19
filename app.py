@@ -1,6 +1,8 @@
 from flask import Flask, request
 import json, random, requests, os, time, re
 from linebot import LineBotApi, WebhookHandler
+from bs4 import BeautifulSoup
+import urllib.parse
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage, QuickReply, 
     QuickReplyButton, MessageAction, FlexSendMessage, LocationMessage, 
@@ -480,17 +482,27 @@ def money(tk, msg, user_id):
 main_menu = {
     "附近美食": ["1公里內4★以上", "3公里內4.2★以上", "5公里內4.5★以上"],
     "附近景點": ["1公里內3.5★以上", "3公里內4★以上", "5公里內4.2★以上", "10公里內4.5★以上"],
-    "各地美食": ["北台灣", "中台灣", "南臺灣", "東台灣"],
-    "各地景點": ["北台灣", "中台灣", "南臺灣", "東台灣"]
+    "各地美食": "",
+    "各地景點": ""
 }
 
-# 台灣縣市與區域的資料
-taiwan_counties = {
-    "北台灣": ["台北市", "新北市", "基隆市", "桃園市", "新竹市", "新竹縣"],
-    "中台灣": ["苗栗縣", "台中市", "彰化縣", "南投縣", "雲林縣"],
-    "南台灣": ["嘉義縣", "嘉義市", "台南市", "高雄市", "屏東縣", "澎湖縣"],
-    "東台灣": ["宜蘭縣", "花蓮縣", "台東縣"] 
-}
+# 台灣縣市
+counties_list = [["台北市", "新北市", "基隆市"],  ["桃園市", "新竹縣", "新竹市"],   
+                 ["宜蘭縣", "苗栗縣", "台中市"],  ["彰化縣", "雲林縣", "南投縣"], 
+                 ["嘉義縣", "嘉義市", "台南市"],  ["高雄市", "屏東縣", "澎湖縣"],   
+                 ["花蓮縣", "台東縣", "金門縣"]]    
+
+# 餐廳類別
+meals_list = [["中式料理","日式料理","居酒屋"], ["義式料理","港式料理","美式料理"], 
+              ["韓式","泰式","小吃"],           ["精緻高級","約會餐廳","餐酒館"],
+              ["早餐","早午餐","宵夜"],         ["火鍋","燒肉","牛排"],
+              ["拉麵","咖哩","素食"],           ["甜點","冰品飲料","飲料店"]]
+
+county_sno = {"台北市":"0001090", "新北市":"0001091", "基隆市":"0001105", "桃園市":"0001107", "新竹縣":"0001108", "新竹市":"0001109", "宜蘭縣":"0001106",
+              "苗栗縣":"0001110", "台中市":"0001112", "彰化縣":"0001113", "雲林縣":"0001115", "南投縣":"0001114", "嘉義縣":"0001116", "嘉義市":"0001117",
+              "台南市":"0001119", "高雄市":"0001121", "屏東縣":"0001122", "澎湖縣":"0001125", "花蓮縣":"0001124", "台東縣":"0001123", "金門縣":"0001126"}
+              
+attraction_cate = {"無障礙旅遊":"26", "旅遊景點":"27", "溫泉景點":"28", "藝文展館":"29", "夜市老街":"30", "古蹟寺廟":"31", "遊樂區":"32", "樂齡旅遊":"34"}
 
 def foodie(tk, user_id, result):
     if result[0] in main_menu:
@@ -571,12 +583,177 @@ def foodie(tk, user_id, result):
                         if not pagetoken:
                             break     # 沒有下一頁，跳出迴圈                  
                         time.sleep(2)   # 有下一頁，等待幾秒鐘（如：2秒鐘以上，避免超過 API 請求限制）
-                if target != '':                            
+                if target == '':                            
+                    target = "無法找到" + result[0]                
+                line_bot_api.reply_message(tk,TextSendMessage(text=target)) 
+        elif len(result) == 1:  # (result[0] == '各地美食' or result[0] == '各地景點') 且 尚未選縣市
+            # 用 loop 建立 CarouselColumn 的 list
+            columns = []
+            regions = main_menu[result[0]]
+            for counties in counties_list:
+                column = CarouselColumn(
+                    #thumbnail_image_url='https://example.com/sample.jpg',  # 可選
+                    #title = "選擇縣市",  # 可選
+                    text = "請選擇行政區域",
+                    actions=[MessageAction(label=county, text=result[0] + " " + county) for county in counties]
+                )
+                columns.append(column)
+            carousel_template = CarouselTemplate(columns=columns)
+            template_message = TemplateSendMessage(alt_text="選擇縣市", template=carousel_template)
+            line_bot_api.reply_message(tk, template_message)
+        elif result[0] == '各地美食':           
+            if len(result) == 2:  # 選完縣市
+                # 用 loop 建立 CarouselColumn 的 list
+                columns = []
+                for meals in meals_list:
+                    column = CarouselColumn(
+                        #thumbnail_image_url='https://example.com/sample.jpg',  # 可選
+                        #title = "選擇餐種",  # 可選
+                        text = "請選擇" + result[1] + "餐廳類別",
+                        actions=[MessageAction(label=meal, text=result[0] + " " + result[1] + " " + meal) for meal in meals]
+                    )
+                    columns.append(column)
+                carousel_template = CarouselTemplate(columns=columns)
+                template_message = TemplateSendMessage(alt_text="選擇餐廳類別", template=carousel_template)
+                line_bot_api.reply_message(tk, template_message)              
+            elif len(result) == 3:  # 選完餐廳類別
+                url = 'https://ifoodie.tw/explore/' + result[1] +'/list/' + result[2]
+                encoded_url = urllib.parse.quote(url, safe=":/") + '?sortby=popular'
+                response = requests.get(encoded_url)
+                soup = BeautifulSoup(response.text,'html.parser') 
+                infos = soup.select('.restaurant-info')
+                target = ''
+                columns = []
+                count = 0
+                for info in infos:
+                    sp = BeautifulSoup(str(info),'html.parser')
+                    rid = sp.select_one('.restaurant-info').get('class')[0]
+                    index = sp.select_one('.index').text
+                    name = sp.select_one('.title-text').text
+                    rating = sp.select_one('.text').text
+                    not_open_now = sp.select_one('.info')
+                    if not_open_now:
+                        not_open_now = not_open_now.text + "\n"
+                    else:
+                        not_open_now = ""
+                    avg_price = sp.select_one('.avg-price')
+                    if avg_price:
+                        avg_price = avg_price.text[2:]   # · 均消 $350，去掉前兩個字元
+                    else:
+                        avg_price = ""
+                    address = sp.select_one('.address-row').text
+                    href = "https://ifoodie.tw/" + sp.select_one('.title-text').get('href')
+                    cover='cover'
+                    img = sp.select_one(f'.{rid}.{cover}')
+                    img = img.get('data-src') or img.get('src')
+                    target += f"{index} {name} {rating}★\n{address}\n"
+                    title = name + "\n" + address
+                    text = rating + "★ " + avg_price + "\n" + not_open_now
+                    if len(title)>40:
+                        title = title[:37] + "..."  # 省略太長的部分
+                    if len(text)>60:
+                        text = text[:57] + "..."  # 省略太長的部分
+                    column = CarouselColumn(
+                        thumbnail_image_url = img,  # 可選
+                        title = title,  # 可選, 40字元
+                        text = text,  # 有title：60字元，無title：120字元
+                        actions=[URIAction(label="WEBSITE", uri=href)]
+                    )
+                    columns.append(column)
+                    count = count + 1
+                    if count == 10:
+                        break
+                if target == '': 
+                    target = "無法找到"               
                     line_bot_api.reply_message(tk,TextSendMessage(text=target)) 
                 else:
-                    print("無法找到" + result[0])
+                    carousel_template = CarouselTemplate(columns=columns)
+                    template_message = TemplateSendMessage(alt_text="顯示餐廳", template=carousel_template)
+                    line_bot_api.reply_message(tk, template_message)              
+        elif result[0] == '各地景點':           
+            if len(result) == 2:  # 選完縣市
+                sno = county_sno[result[1]]
+                url = 'https://www.taiwan.net.tw/m1.aspx?sno=' + sno
+                response = requests.get(url)
+                soup = BeautifulSoup(response.text,'html.parser') 
 
+                columns = []
+                actions = []                
+                radios = soup.select('.category-radio')
+                for radio in radios:
+                    text = radio.text.strip()
+                    if text != 'All':
+                        actions.append(MessageAction(label=text, text=result[0] + " " + result[1] + " " + text))                        
+                        if len(actions) == 3:
+                            column = CarouselColumn(
+                                text = "請選擇" + result[1] + "景點類別",
+                                actions = actions
+                            )
+                            columns.append(column)
+                            actions = []           
+                n = 3 - (len(actions) % 3)
+                if n < 3:
+                    for i in range(0, n):
+                        #actions.append(URIAction(uri='#'))
+                        actions.append(MessageAction(label=" ", text=result[0] + " " + result[1]))   # label不能空值                      
+                    column = CarouselColumn(
+                        text = "請選擇" + result[1] + "景點類別",
+                        actions = actions
+                    )
+                    columns.append(column)
+                carousel_template = CarouselTemplate(columns=columns)
+                template_message = TemplateSendMessage(alt_text="選擇景點類別", template=carousel_template)
+                line_bot_api.reply_message(tk, template_message)              
+            elif len(result) == 3:  # 選完景點類別
+                sno = county_sno[result[1]]
+                url = 'https://www.taiwan.net.tw/m1.aspx?sno=' + sno
+                response = requests.get(url)
+                soup = BeautifulSoup(response.text,'html.parser') 
+                
+                cid = attraction_cate[result[2]]
+                attrs = soup.select('.col-12_sm-6_md-3')
+                target = ''
+                columns = []
+                count = 0
+                for attr in attrs:
+                    sp = BeautifulSoup(str(attr),'html.parser')
+                    data_type = sp.select_one('.col-12_sm-6_md-3').get('data-type')
+                    if cid in data_type:
+                        href = sp.select_one('.card-link').get('href')
+                        href = href.replace("amp;", "")
+                        href = 'https://www.taiwan.net.tw/' + href
+                        view = sp.select_one('.view-badge').text.strip()
+                        title = sp.select_one('.card-title').text.strip()
+                        target += f"{title} {view}\n"
+                        img = sp.select_one('img').get('data-src')
+                        tags = sp.select('.hashtag a')
+                        tag_list = ""
+                        for tag in tags:
+                            if tag_list != "":
+                                tag_list += ", "
+                            tag_list += tag.text  
+                        #mmm = title + " " + view + '\n' + tag_list + '\n' + href
+                        #line_bot_api.reply_message(tk,TextSendMessage(text=mmm)) 
+                        #return
+                        column = CarouselColumn(
+                            thumbnail_image_url = img,  # 可選
+                            title = title,  # 可選, 40字元
+                            text = '點閱次數：' + view + '\n' + '標籤：' + tag_list,  # 有title：60字元，無title：120字元
+                            actions=[URIAction(label="WEBSITE", uri=href)]
+                        )
+                        columns.append(column)
+                        count = count + 1
+                        if count == 10:
+                            break
+                if target == '': 
+                    target = "無法找到"               
+                    line_bot_api.reply_message(tk,TextSendMessage(text=target)) 
+                else:
+                    carousel_template = CarouselTemplate(columns=columns)
+                    template_message = TemplateSendMessage(alt_text="顯示景點", template=carousel_template)
+                    line_bot_api.reply_message(tk, template_message)              
     else:
+        # 如果用戶輸入其他文字，顯示主選單
         buttons_template = ButtonsTemplate(
             title="選擇項目", 
             text="請選擇你要查詢的項目", 
@@ -592,9 +769,7 @@ def location(latitude, longitude, user_id, tk):
     buttons_template = ButtonsTemplate(
         title="選擇項目", 
         text="請選擇你要查詢的項目", 
-        actions=[
-            MessageAction(label=menu_item, text=menu_item) for menu_item in main_menu.keys()
-        ]
+        actions=[MessageAction(label=menu_item, text=menu_item) for menu_item in main_menu.keys()]
     )
     template_message = TemplateSendMessage(alt_text="選擇項目", template=buttons_template)
     line_bot_api.reply_message(tk, template_message)

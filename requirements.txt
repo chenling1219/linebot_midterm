@@ -6,3 +6,4 @@ geopy
 gspread    
 oauth2client       
 apscheduler
+beautifulsoup4

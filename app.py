@@ -3,11 +3,13 @@ import json, random, requests, os, time, re
 from linebot import LineBotApi, WebhookHandler
 from bs4 import BeautifulSoup
 import urllib.parse
+from linebot.models import *
+'''
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage, QuickReply, 
     QuickReplyButton, MessageAction, FlexSendMessage, LocationMessage, 
     PostbackAction, PostbackEvent, TemplateSendMessage, ButtonsTemplate)
-
+'''
 #Azure Translation
 from azure.ai.translation.text import TextTranslationClient
 from azure.core.credentials import AzureKeyCredential
@@ -985,7 +987,7 @@ def handle_location_message(event):
     latitude = event.message.latitude
     longitude = event.message.longitude
     user_id = event.source.user_id
-    if last_msg == "foodie01":
+    if last_msg == "foodie02":
         location(latitude, longitude, user_id, tk)
         last_msg = "foodie02"
     elif last_msg == "weather":

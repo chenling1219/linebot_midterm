@@ -279,7 +279,9 @@ def choose():
     return choose
 
 def money(tk, msg, user_id):
-    if msg in ["餐飲", "交通", "購物","醫療","娛樂", "其他"]:
+    if msg == '我要記帳':
+        line_bot_api.reply_message(tk, choose())
+    elif msg in ["餐飲", "交通", "購物","醫療","娛樂", "其他"]:
         if user_id in user_data:  # 確認用戶有先執行「我要記帳」
             user_data[user_id]["category"] = msg
             line_bot_api.reply_message(tk, TextSendMessage(text=f'你選擇了 {msg} 類別，請輸入金額。'))

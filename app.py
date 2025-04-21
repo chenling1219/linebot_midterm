@@ -281,6 +281,7 @@ def choose():
 def money(tk, msg, user_id):
     if msg == '我要記帳':
         line_bot_api.reply_message(tk, choose())
+        user_data[user_id] = {"category": None, "amount": None}
     elif msg in ["餐飲", "交通", "購物","醫療","娛樂", "其他"]:
         if user_id in user_data:  # 確認用戶有先執行「我要記帳」
             user_data[user_id]["category"] = msg
@@ -925,10 +926,7 @@ def handle_message(event):
         last_msg = "translator"
     elif msg == '記帳':
         line_bot_api.reply_message(tk, TextSendMessage(text='請輸入關鍵字來進行記帳操作\n- 我要記帳\n- 查詢\n- 查 {類別}\n- 查詢日期 YYYY-MM-DD\n- 查詢月 YYYY-MM\n- 查詢月類別 YYYY-MM {類別}'))
-        user_data[user_id] = {"category": None, "amount": None}
         last_msg = "money"
-    elif msg == '我要記帳':
-        line_bot_api.reply_message(tk, choose())
     elif msg == '關閉記帳功能':
         last_msg = ""
     elif msg == '查詢附近美食與景點':

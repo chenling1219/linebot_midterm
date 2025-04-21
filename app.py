@@ -132,7 +132,7 @@ def randomone(tk, msg, last_msg_01, memlist):
     elif msg == '清空清單':
         random_list.clear()
         line_bot_api.reply_message(tk, TextSendMessage(text='已清空抽選清單'))
-    elif msg == '給我一些想法!':
+    elif msg == '給我一些想法':
         line_bot_api.reply_message(tk, listpush())
     elif msg == '吃什麼':
         line_bot_api.reply_message(tk, foodpush())
@@ -277,34 +277,7 @@ def choose(num, month_str):
             )
             
         )
-    elif num == 2:
-        choose = TextSendMessage(
-            text='請選擇要查詢的分類：',
-            quick_reply=QuickReply(
-                quick_replies = [
-                    QuickReplyButton(action=MessageAction(label='餐飲', text="查 餐飲")),
-                    QuickReplyButton(action=MessageAction(label='交通', text="查 交通")),
-                    QuickReplyButton(action=MessageAction(label='購物', text="查 購物")),
-                    QuickReplyButton(action=MessageAction(label='醫療', text="查 醫療")),
-                    QuickReplyButton(action=MessageAction(label='娛樂', text="查 娛樂")),
-                    QuickReplyButton(action=MessageAction(label='其他', text="查 其他")),
-                ]
-            )
-        )
-    elif num == 3:
-        choose = TextSendMessage(
-            text='請選擇要查詢的類別：',
-            quick_reply=QuickReply(
-                quick_replies = [
-                    QuickReplyButton(action=MessageAction(label='餐飲', text=f"查詢月類別 {month_str} 餐飲")),
-                    QuickReplyButton(action=MessageAction(label='交通', text=f"查詢月類別 {month_str} 交通")),
-                    QuickReplyButton(action=MessageAction(label='購物', text=f"查詢月類別 {month_str} 購物")),
-                    QuickReplyButton(action=MessageAction(label='醫療', text=f"查詢月類別 {month_str} 醫療")),
-                    QuickReplyButton(action=MessageAction(label='娛樂', text=f"查詢月類別 {month_str} 娛樂")),
-                    QuickReplyButton(action=MessageAction(label='其他', text=f"查詢月類別 {month_str} 其他")),
-                ]
-            )
-        )
+  
     return choose
 
 def money(tk, msg, user_id):
@@ -478,7 +451,7 @@ def money(tk, msg, user_id):
     # 其他無效輸入
     
     else:
-        line_bot_api.reply_message(tk, TextSendMessage(text='請輸入關鍵字來進行記帳操作\n- 我要記帳\n- 查詢\n- 查詢類別\n- 查詢日期 YYYY-MM-DD\n- 查詢月 YYYY-MM\n- 查詢月類別 YYYY-MM'))
+        line_bot_api.reply_message(tk, TextSendMessage(text='請輸入關鍵字來進行記帳操作\n- 我要記帳\n- 查詢\n- 查 {類別}\n- 查詢日期 YYYY-MM-DD\n- 查詢月 YYYY-MM\n- 查詢月類別 YYYY-MM {類別}'))
 
 # -------- 查詢附近美食 --------
 main_menu = {
@@ -942,7 +915,7 @@ def handle_message(event):
         random_list.clear()
         #FlexMessage = json.load(open('random.json','r',encoding='utf-8'))
         #line_bot_api.reply_message(tk, FlexSendMessage('抽籤',FlexMessage))
-        line_bot_api.reply_message(tk, TextSendMessage(text='給我一些想法! -> 推薦清單\n清空清單 -> 清單重置\n\n直接輸入文字將加入抽選項目中\n選項都加入完後 輸入開始抽籤吧'))
+        line_bot_api.reply_message(tk, TextSendMessage(text='給我一些想法 -> 推薦清單\n清空清單 -> 清單重置\n\n直接輸入文字將加入抽選項目中\n選項都加入完後 輸入開始抽籤吧'))
         last_msg = "random"
     elif msg == '查詢天氣':
         line_bot_api.reply_message(tk, TextSendMessage(text='請傳送位置資訊以查詢天氣與空氣品質'))
@@ -950,8 +923,8 @@ def handle_message(event):
     elif msg == '翻譯':
         line_bot_api.reply_message(tk, TextSendMessage(text='翻譯功能啟用\n請輸入欲翻譯的文字:'))
         last_msg = "translator"
-    elif msg == '我要記帳':
-        line_bot_api.reply_message(tk, choose(1,''))
+    elif msg == '記帳':
+        line_bot_api.reply_message(tk, TextSendMessage(text='請輸入關鍵字來進行記帳操作\n- 我要記帳\n- 查詢\n- 查 {類別}\n- 查詢日期 YYYY-MM-DD\n- 查詢月 YYYY-MM\n- 查詢月類別 YYYY-MM {類別}'))
         user_data[user_id] = {"category": None, "amount": None}
         last_msg = "money"
     elif msg == '關閉記帳功能':

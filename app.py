@@ -915,7 +915,7 @@ def handle_message(event):
         random_list.clear()
         #FlexMessage = json.load(open('random.json','r',encoding='utf-8'))
         #line_bot_api.reply_message(tk, FlexSendMessage('抽籤',FlexMessage))
-        line_bot_api.reply_message(tk, TextSendMessage(text='給我一些想法! -> 推薦清單\n清空清單 -> 清單重置\n\n直接輸入文字將加入抽選項目中\n選項都加入完後 輸入開始抽籤吧'))
+        line_bot_api.reply_message(tk, TextSendMessage(text='給我一些想法 -> 推薦清單\n清空清單 -> 清單重置\n\n直接輸入文字將加入抽選項目中\n選項都加入完後 輸入開始抽籤吧'))
         last_msg = "random"
     elif msg == '查詢天氣':
         line_bot_api.reply_message(tk, TextSendMessage(text='請傳送位置資訊以查詢天氣與空氣品質'))
@@ -923,8 +923,8 @@ def handle_message(event):
     elif msg == '翻譯':
         line_bot_api.reply_message(tk, TextSendMessage(text='翻譯功能啟用\n請輸入欲翻譯的文字:'))
         last_msg = "translator"
-    elif msg == '我要記帳':
-        line_bot_api.reply_message(tk, choose(1,''))
+    elif msg == '記帳':
+        line_bot_api.reply_message(tk, TextSendMessage(text='請輸入關鍵字來進行記帳操作\n- 我要記帳\n- 查詢\n- 查 {類別}\n- 查詢日期 YYYY-MM-DD\n- 查詢月 YYYY-MM\n- 查詢月類別 YYYY-MM {類別}'))
         user_data[user_id] = {"category": None, "amount": None}
         last_msg = "money"
     elif msg == '關閉記帳功能':

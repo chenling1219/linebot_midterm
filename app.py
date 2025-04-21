@@ -132,7 +132,7 @@ def randomone(tk, msg, last_msg_01, memlist):
     elif msg == '清空清單':
         random_list.clear()
         line_bot_api.reply_message(tk, TextSendMessage(text='已清空抽選清單'))
-    elif msg == '給我一些想法!':
+    elif msg == '給我一些想法':
         line_bot_api.reply_message(tk, listpush())
     elif msg == '吃什麼':
         line_bot_api.reply_message(tk, foodpush())
@@ -261,22 +261,20 @@ def chooseLen(tk, msg):
 # 開啟指定的 Google 試算表
 sheet = sheets_client.open("python money").sheet1
 
-def choose(num, month_str):
-    if msg == '我要記帳':
-        choose = TextSendMessage(
-            text='請選擇分類',
-            quick_reply=QuickReply(
-                items=[
-                    QuickReplyButton(action=MessageAction(label='餐飲', text="餐飲")),
-                    QuickReplyButton(action=MessageAction(label='交通', text="交通")),
-                    QuickReplyButton(action=MessageAction(label='購物', text="購物")),
-                    QuickReplyButton(action=MessageAction(label='醫療', text="醫療")),
-                    QuickReplyButton(action=MessageAction(label='娛樂', text="娛樂")),
-                    QuickReplyButton(action=MessageAction(label='其他', text="其他")),
-                ]
-            )
-            
+def choose():
+    choose = TextSendMessage(
+        text='請選擇分類',
+        quick_reply=QuickReply(
+            items=[
+                QuickReplyButton(action=MessageAction(label='餐飲', text="餐飲")),
+                QuickReplyButton(action=MessageAction(label='交通', text="交通")),
+                QuickReplyButton(action=MessageAction(label='購物', text="購物")),
+                QuickReplyButton(action=MessageAction(label='醫療', text="醫療")),
+                QuickReplyButton(action=MessageAction(label='娛樂', text="娛樂")),
+                QuickReplyButton(action=MessageAction(label='其他', text="其他")),
+            ]
         )
+    )
   
     return choose
 
@@ -927,6 +925,8 @@ def handle_message(event):
         line_bot_api.reply_message(tk, TextSendMessage(text='請輸入關鍵字來進行記帳操作\n- 我要記帳\n- 查詢\n- 查 {類別}\n- 查詢日期 YYYY-MM-DD\n- 查詢月 YYYY-MM\n- 查詢月類別 YYYY-MM {類別}'))
         user_data[user_id] = {"category": None, "amount": None}
         last_msg = "money"
+    elif msg == '我要記帳':
+        line_bot_api.reply_message(tk, choose())
     elif msg == '關閉記帳功能':
         last_msg = ""
     elif msg == '查詢附近美食與景點':

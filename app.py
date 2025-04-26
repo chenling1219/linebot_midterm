@@ -161,52 +161,124 @@ def randomone(tk, msg, last_msg_01, memlist):
 
 # -------- 天氣查詢功能 --------
 def weather(address):
-    result = {}
-    code = os.getenv('code')
-    try:
-        urls = [
-            f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001?Authorization={code}',
-            f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization={code}'
-        ]
-        for url in urls:
+    def nowWeather(address):
+        result = {}
+        code = 'CWA-9ECE9E2D-1DF4-45DB-8999-FAC76234B2A3'
+
+        # 即時天氣
+        try:
+            urls = [
+                f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001?Authorization={code}',
+                f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization={code}'
+            ]
+            for url in urls:
+                req = requests.get(url) 
+                data = req.json()
+                station = data['records']['Station']
+                for i in station:
+                    city = i['GeoInfo']['CountyName']
+                    area = i['GeoInfo']['TownName']
+                    key = f'{city}{area}'
+                    if key not in result:
+                        weather = i['WeatherElement']['Weather']
+                        temp = i['WeatherElement']['AirTemperature']
+                        humid = i['WeatherElement']['RelativeHumidity']
+                        #if({weather}==-99):
+                        #    result[key] = f'目前溫度 {temp}°C，相對濕度 {humid}%'
+                        if ((weather == -99) or (temp == -99) or (temp == -99)):
+                            result[key] = f'目前資料有誤請稍後再試'
+                        else:
+                            result[key] = f'目前天氣：{weather}，溫度 {temp}°C，相對濕度 {humid}%'
+        except Exception as e:
+            print("即時天氣抓取失敗:", e)
+
+
+        # 回傳結果
+        output = '找不到氣象資訊'
+        for key, value in result.items():
+            if key in address:
+                output = f'{value}'
+                #output = f'{value}'
+                break
+
+        return output
+    
+    def futureWeather(address):
+        result = {}
+        code = 'CWA-9ECE9E2D-1DF4-45DB-8999-FAC76234B2A3'
+
+        # 未來12小時天氣
+        try:
+            url = f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization={code}'
             req = requests.get(url)
             data = req.json()
-            station = data['records']['Station']
-            for i in station:
-                city = i['GeoInfo']['CountyName']
-                area = i['GeoInfo']['TownName']
-                key = f'{city}{area}'
+            
+            locations = data['records']['location']
+            for loc in locations:
+                city = loc['locationName']
+                weather_elements = loc['weatherElement']
+                
+                # weather_elements 每個是不同類型：Wx(天氣狀況)、PoP(降雨機率)、MinT(最低溫)、MaxT(最高溫)、CI(舒適度)
+                weather_info = {}
+                for element in weather_elements:
+                    element_name = element['elementName']
+                    weather_info[element_name] = element['time'][0]['parameter']['parameterName']  # 取未來第一個時段
+                
+                key = f'{city}'
                 if key not in result:
-                    weather = i['WeatherElement']['Weather']
-                    temp = i['WeatherElement']['AirTemperature']
-                    humid = i['WeatherElement']['RelativeHumidity']
-                    result[key] = f'目前天氣：{weather}，溫度 {temp}°C，相對濕度 {humid}%'
-    except:
-        return "🌧️ 目前無法取得天氣資料"
+                    # 判斷資料是否完整
+                    if ('Wx' not in weather_info) or ('PoP' not in weather_info) or ('MinT' not in weather_info) or ('MaxT' not in weather_info):
+                        result[key] = f'目前資料有誤請稍後再試'
+                    else:
+                        result[key] = f"未來12小時天氣：{weather_info['Wx']}，降雨機率 {weather_info['PoP']}%，溫度 {weather_info['MinT']}°C ~ {weather_info['MaxT']}°C"
+        except Exception as e:
+            print("未來12小時天氣抓取失敗:", e)
 
-    try:
-        aqi_url = 'https://data.moenv.gov.tw/api/v2/aqx_p_432?api_key=你的 AQI 金鑰&limit=1000&format=JSON'
-        req = requests.get(aqi_url)
-        data = req.json()
-        records = data['records']
-        aqi_status = ["良好", "普通", "對敏感族群不健康", "對所有族群不健康", "非常不健康", "危害"]
 
-        for item in records:
-            county = item['county']
-            sitename = item['sitename']
-            aqi = int(item['aqi'])
-            status = aqi_status[min(aqi // 50, 5)]
-            key = f'{county}{sitename}'
-            for k in result:
-                if county in k:
-                    result[k] += f'\n\nAQI：{aqi}，空氣品質{status}。'
-    except:
-        pass
 
-    for key, value in result.items():
-        if key in address:
-            return f'「{address}」\n{value}\n\n🔗 [詳細內容請見中央氣象署官網](https://www.cwa.gov.tw/)'
-    return "找不到天氣資訊"
+        # 回傳結果
+        output = '找不到氣象資訊'
+        for key, value in result.items():
+            if key in address:
+                output = f'{value}'
+                break
+
+        return output
+    
+    def air(address):
+        result = {}
+
+        # 空氣品質
+        try:
+            aqi_url = 'https://data.moenv.gov.tw/api/v2/aqx_p_432?api_key=eba9f0a9-069d-4d66-bfe6-733dcefa4302&limit=1000&format=JSON'
+            req = requests.get(aqi_url)
+            data = req.json()
+            records = data['records']
+            aqi_status = ["良好", "普通", "對敏感族群不健康", "對所有族群不健康", "非常不健康", "危害"]
+            
+            # 建立縣市的第一筆資料
+            county_first_record = {}
+
+            for item in records:
+                county = item['county']
+                if county not in county_first_record:
+                    aqi = int(item['aqi'])
+                    status = aqi_status[min(aqi // 50, 5)]
+                    county_first_record[county] = f'空氣品質{status}，AQI：{aqi}。'
+
+        except Exception as e:
+            print("空氣品質抓取失敗:", e)
+
+        # 回傳結果
+        output = '找不到氣象資訊'
+        for county, info in county_first_record.items():
+            if county in address:
+                output = info
+                break
+
+        return output
+    result = f"{nowWeather(address)}\n\n{futureWeather(address)}\n\n{air(address)}\n\n🔗 [詳細內容請見中央氣象署官網](https://www.cwa.gov.tw/)'"
+    return result
 
 # -------- 翻譯功能 --------
 def azure_translate(user_input, to_language):

@@ -1,44 +1,32 @@
 from flask import Flask, request
 import json, random, requests, os, time, re
 from linebot import LineBotApi, WebhookHandler
+from linebot.models import *
 from bs4 import BeautifulSoup
 import urllib.parse
-from linebot.models import *
-'''
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage, QuickReply, 
-    QuickReplyButton, MessageAction, FlexSendMessage, LocationMessage, 
-    PostbackAction, PostbackEvent, TemplateSendMessage, ButtonsTemplate)
-'''
-#Azure Translation
 from azure.ai.translation.text import TextTranslationClient
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError
-
-#Money
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, timedelta, timezone, timedelta
-
-#calender
+from datetime import datetime, timedelta, timezone
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from apscheduler.schedulers.background import BackgroundScheduler
+from openai import OpenAI
+import pdfplumber
+import tempfile
 
-#read env
-from oauth2client.service_account import ServiceAccountCredentials
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-
-random_list=[]
+random_list = []
 last_msg = ""
 memlist = ""
+user_pdf_data = {}  
 
 app = Flask(__name__)
 
 # -------- LINE BOT 憑證 --------
 access_token = os.getenv("access_token")
-channel_secret =  os.getenv("channel_secret")
+channel_secret = os.getenv("channel_secret")
 line_bot_api = LineBotApi(access_token)
 line_handler = WebhookHandler(channel_secret)
 
@@ -50,9 +38,8 @@ REGION = os.getenv("REGION")
 # money
 def setup_sheets_client():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
     credentials_dict = {
-        "type" :"service_account",
+        "type": "service_account",
         "project_id": os.getenv("project_id_money"),
         "private_key_id": os.getenv("private_key_id_money"),
         "private_key": os.getenv("private_key_money").replace('\\n', '\n'),
@@ -60,17 +47,74 @@ def setup_sheets_client():
         "client_id": os.getenv("client_id_money"),
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
         "client_x509_cert_url": os.getenv("client_x509_cert_url_money"),
         "universe_domain": "googleapis.com"
     }
-    
-
     creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     client = gspread.authorize(creds)
     return client
 sheets_client = setup_sheets_client()
 user_data = {}
+
+# -------- ChatPDF Functions --------
+def extract_pdf_text(file_path):
+    """Extract text from a PDF file using pdfplumber."""
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            text = ""
+            for page in pdf.pages:
+                text += page.extract_text() or ""
+        return text
+    except Exception as e:
+        print(f"PDF extraction failed: {e}")
+        return None
+
+# 初始化 OpenAI 客戶端
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# 在檔案頂部加入快取相關匯入
+from cachetools import TTLCache
+from aiolimiter import AsyncLimiter
+
+# 初始化快取（TTL 快取，儲存 5 分鐘）
+query_cache = TTLCache(maxsize=1000, ttl=300)
+
+# 初始化速率限制（每分鐘最多 20 次請求）
+rate_limiter = AsyncLimiter(20, 60)  # 每 60 秒最多 20 次請求
+
+async def process_pdf_query(pdf_text, query):
+    """使用 OpenAI 處理用戶對 PDF 內容的查詢，並加入快取和速率限制"""
+    if not pdf_text:
+        return "沒有可用的 PDF 內容。"
+    
+    cache_key = f"{pdf_text[:50]}{query}"
+    if cache_key in query_cache:
+        return query_cache[cache_key]
+    
+    try:
+        # 應用速率限制
+        async with rate_limiter:
+            prompt = f"以下是 PDF 內容：\n\n{pdf_text}\n\n用戶問題：{query}\n\n請根據 PDF 內容回答問題，並以繁體中文回覆。"
+            response = openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "你是一個能閱讀 PDF 內容並回答問題的助手。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.7
+            )
+            answer = response.choices[0].message.content.strip()
+            query_cache[cache_key] = answer
+            return answer if answer else "無法根據 PDF 內容回答你的問題。"
+    except Exception as e:
+        print(f"OpenAI 處理失敗: {e}")
+        error_msg = str(e)
+        if "insufficient_quota" in error_msg:
+            return "很抱歉，目前 OpenAI API 配額已用完，請稍後再試或聯繫管理員升級計畫。"
+        return f"處理查詢時發生錯誤：{error_msg}"
+
 
 # -------- 抽籤功能 --------
 def foodpush():
@@ -963,31 +1007,43 @@ def start_scheduler():
     scheduler.add_job(daily_push, 'cron', hour=8, minute=0)
     scheduler.start()
 
-
-# -------- 接收 LINE 訊息 --------
+# -------- Receiving LINE Messages --------
 @app.route("/callback", methods=['POST'])
 def callback():
-    signature = request.headers['X-Line-Signature']        
+    signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
     try:
-        line_handler.handle(body, signature)  
+        line_handler.handle(body, signature)
     except:
-        print("error, but still work.") 
+        print("error, but still work.")
     return 'OK'
-
 
 @line_handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    global last_msg, memlist, random_list
+    global last_msg, memlist, random_list, user_pdf_data
     msg = event.message.text
     tk = event.reply_token
     user_id = event.source.user_id
     result = msg.split()
-    if msg == '抽籤':
+    
+    if msg == 'ChatPDF':
+        line_bot_api.reply_message(tk, TextSendMessage(text='請上傳PDF檔案，或輸入問題來查詢已上傳的PDF內容。'))
+        last_msg = "chatpdf"
+    elif last_msg == "chatpdf" and msg != '關閉ChatPDF':
+        # 假設 process_pdf_query 是 async 函數，需使用 asyncio 運行
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        if user_id in user_pdf_data and user_pdf_data[user_id]:
+            response = loop.run_until_complete(process_pdf_query(user_pdf_data[user_id], msg))
+            line_bot_api.reply_message(tk, TextSendMessage(text=response))
+        else:
+            line_bot_api.reply_message(tk, TextSendMessage(text='請先上傳PDF檔案。'))
+    
+    # Existing intents
+    elif msg == '抽籤':
         random_list.clear()
-        #FlexMessage = json.load(open('random.json','r',encoding='utf-8'))
-        #line_bot_api.reply_message(tk, FlexSendMessage('抽籤',FlexMessage))
         line_bot_api.reply_message(tk, TextSendMessage(text='給我一些想法 -> 推薦清單\n清空清單 -> 清單重置\n\n直接輸入文字將加入抽選項目中\n選項都加入完後 輸入開始抽籤吧'))
         last_msg = "random"
     elif msg == '查詢天氣':
@@ -1021,8 +1077,6 @@ def handle_message(event):
     elif last_msg == "calender":
         intent = parse_intent(msg)
         calender(tk, intent, msg)
-    #print(msg)
-
 
 @line_handler.add(MessageEvent, message=LocationMessage)
 def handle_location_message(event):
@@ -1038,7 +1092,40 @@ def handle_location_message(event):
     elif last_msg == "weather":
         line_bot_api.reply_message(tk, TextSendMessage(text=weather(address)))
 
+@line_handler.add(MessageEvent, message=FileMessage)
+def handle_file_message(event):
+    global last_msg, user_pdf_data
+    tk = event.reply_token
+    user_id = event.source.user_id
+    file_id = event.message.id  # 使用 message.id 獲取檔案 ID
+    file_name = event.message.file_name
     
+    if last_msg == "chatpdf" and file_name.lower().endswith('.pdf'):
+        try:
+            # 從 LINE 下載檔案內容
+            file_content = line_bot_api.get_message_content(file_id)
+            # 使用 tempfile 儲存 PDF
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                for chunk in file_content.iter_content():
+                    temp_file.write(chunk)
+                temp_file_path = temp_file.name
+            
+            # 提取 PDF 文字
+            pdf_text = extract_pdf_text(temp_file_path)
+            if pdf_text:
+                user_pdf_data[user_id] = pdf_text
+                line_bot_api.reply_message(tk, TextSendMessage(text='PDF已上傳並處理完成！請輸入問題來查詢PDF內容。'))
+            else:
+                line_bot_api.reply_message(tk, TextSendMessage(text='無法解析PDF內容，請檢查檔案是否有效。'))
+            
+            # 清理臨時檔案
+            os.unlink(temp_file_path)
+        except Exception as e:
+            print(f"處理 PDF 時發生錯誤: {e}")
+            line_bot_api.reply_message(tk, TextSendMessage(text=f'處理 PDF 失敗：{str(e)}'))
+    else:
+        line_bot_api.reply_message(tk, TextSendMessage(text='請在ChatPDF模式下上傳PDF檔案。'))
+
 @line_handler.add(PostbackEvent)
 def handle_postback(event):
     tk = event.reply_token
@@ -1053,4 +1140,5 @@ def handle_postback(event):
     line_bot_api.reply_message(tk, [TextMessage(text=result if result else "No translation available")])
 
 if __name__ == '__main__':
+    start_scheduler()
     app.run()
